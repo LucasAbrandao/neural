@@ -2,17 +2,32 @@ import pygame
 
 class Track:
     def __init__(self, track_path):
-        # Load image
-        self.image = pygame.image.load(track_path).convert()
+        raw_image = pygame.image.load(track_path)
+        self.image = raw_image.convert()
         self.rect = self.image.get_rect()
+        self.width, self.height = self.rect.size
 
-        # Create mask for collision detection
-        self.mask = pygame.mask.from_threshold(self.image, (255, 255, 255), (1, 1, 1))  # detecta área branca como pista
+        # Máscara da pista válida (parte branca)
+        self.valid_mask = pygame.mask.from_threshold(
+            self.image, (255, 255, 255), (10, 10, 10)
+        )
+
+        # Alias para facilitar integração com o carro
+        self.mask = self.valid_mask
+
+        # Máscara da pista inválida = pixels que NÃO são brancos
+        self.invalid_mask = pygame.Mask((self.width, self.height))
+        self.invalid_mask.fill()  # tudo preenchido
+        self.invalid_mask.erase(self.valid_mask, (0, 0))  # remove parte válida
 
     def draw(self, screen):
         screen.blit(self.image, (0, 0))
 
-    def check_collision(self, car_rect):
-        offset = (car_rect.x - self.rect.x, car_rect.y - self.rect.y)
-        overlap = self.mask.overlap_area(pygame.mask.Mask(car_rect.size, True), offset)
-        return overlap == 0  # retorna True se saiu da pista
+    def check_collision(self, car):
+        # Deslocamento entre carro e pista
+        offset = (car.rect.x - self.rect.x, car.rect.y - self.rect.y)
+
+        # Agora testamos contra a área INVÁLIDA
+        overlap = self.invalid_mask.overlap(car.mask, offset)
+
+        return overlap is not None

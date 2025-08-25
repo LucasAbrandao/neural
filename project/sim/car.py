@@ -1,65 +1,76 @@
 import pygame
 import math
 
-# Setup
-pygame.init()
-WIDTH, HEIGHT = 800, 600
-win = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("2D Car Simulation")
-
-# select Load car image
-
-# car_image = pygame.image.load("sprites/carModels/carYellow.png")   
-# car_image = pygame.transform.scale(car_image, (100, 60))  
-
-car_image = pygame.image.load("sprites/carModels/carF1.png")   
-car_image = pygame.transform.scale(car_image, (100, 80))  
+from sensors import Sensors
 
 class Car:
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.angle = 0
+        # Carrega sprite
+        self.original_image = pygame.image.load("sprites/carModels/carF1.png").convert_alpha()
+
+        # Escala o carro para um tamanho mais razoável (90x54 mantém proporção ~50/30)
+        self.original_image = pygame.transform.scale(self.original_image, (90, 54)) 
+
+        self.image = self.original_image
+        self.rect = self.image.get_rect(center=(x, y))
+
+        # Máscara inicial
+        self.mask = pygame.mask.from_surface(self.image)
+
+        # Movimento
+        self.angle = 0   # ângulo inicial
         self.speed = 0
-        self.image = car_image
-    
-    def update(self):
+        self.acceleration = 0.2
+        self.max_speed = 5
+        self.rotation_speed = 5
+
+        # Sensores (ordem: começa esquerda e vai horário)
+        self.sensors = Sensors(
+            angles=[-90, -135, 180, 135, 90, 45, 0, -45]
+        )
+
+    def update(self, track_mask=None):
         keys = pygame.key.get_pressed()
+
+        # Controle de aceleração
         if keys[pygame.K_UP]:
-            self.speed = 5
+            self.speed = min(self.speed + self.acceleration, self.max_speed)
+        elif keys[pygame.K_DOWN]:
+            self.speed = max(self.speed - self.acceleration, -self.max_speed/2)
         else:
-            self.speed = 0
+            # Atrito
+            if self.speed > 0:
+                self.speed -= 0.1
+            elif self.speed < 0:
+                self.speed += 0.1
+
+        # Rotação
         if keys[pygame.K_LEFT]:
-            self.angle += 5
+            self.angle -= self.rotation_speed
         if keys[pygame.K_RIGHT]:
-            self.angle -= 5
+            self.angle += self.rotation_speed
 
-        # Atualiza posição
+        # Movimento baseado no ângulo
         rad = math.radians(self.angle)
-        self.x += self.speed * math.cos(rad)
-        self.y -= self.speed * math.sin(rad)
+        dx = self.speed * math.cos(rad)
+        dy = self.speed * math.sin(rad)
+        self.rect.x += dx
+        self.rect.y += dy
 
-    def draw(self, win):
-        rotated = pygame.transform.rotate(self.image, self.angle)
-        rect = rotated.get_rect(center=(self.x, self.y))
-        win.blit(rotated, rect.topleft)
+        # Atualiza sprite rotacionado
+        self.image = pygame.transform.rotate(self.original_image, -self.angle)  # inversão pra alinhar
+        self.rect = self.image.get_rect(center=self.rect.center)
 
-def main():
-    clock = pygame.time.Clock()
-    car = Car(WIDTH//2, HEIGHT//2)
-    run = True
-    while run:
-        clock.tick(60)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
+        # Atualiza máscara baseada na rotação
+        self.mask = pygame.mask.from_surface(self.image)
 
-        car.update()
-        win.fill((30, 30, 30))
-        car.draw(win)
-        pygame.display.update()
+        # Atualiza sensores
+        if track_mask:
+            self.sensors.update(self.angle, self.rect.center, track_mask)
 
-    pygame.quit()
+    def draw(self, screen):
+        # Desenha o carro
+        screen.blit(self.image, self.rect.topleft)
 
-if __name__ == "__main__":
-    main()
+        # Desenha sensores para debug
+        self.sensors.draw(screen, self.angle, self.rect.center)
