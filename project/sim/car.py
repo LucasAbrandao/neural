@@ -2,6 +2,7 @@ import pygame
 import math
 
 from sensors import Sensors
+from nn.policy import CarPolicy  # novo: controlador NN
 
 class Car:
     def __init__(self, x, y):
@@ -29,7 +30,38 @@ class Car:
             angles=[-90, -135, 180, 135, 90, 45, 0, -45]
         )
 
+        # IA (opcional)
+        self.policy = CarPolicy(input_size=len(self.sensors.angles))
+        self.use_ai = False
+
     def update(self, track_mask=None):
+        if self.use_ai and track_mask:
+            # Normaliza sensores (até 300 px, por exemplo)
+            inputs = [min(d, 300) / 300 for d in self.sensors.distances]
+            action, _ = self.policy.act(inputs)
+            self.apply_action(action)
+        else:
+            self.manual_control()
+
+        # Movimento baseado no ângulo
+        rad = math.radians(self.angle)
+        dx = self.speed * math.cos(rad)
+        dy = self.speed * math.sin(rad)
+        self.rect.x += dx
+        self.rect.y += dy
+
+        # Atualiza sprite rotacionado
+        self.image = pygame.transform.rotate(self.original_image, -self.angle)  # inversão pra alinhar
+        self.rect = self.image.get_rect(center=self.rect.center)
+
+        # Atualiza máscara baseada na rotação
+        self.mask = pygame.mask.from_surface(self.image)
+
+        # Atualiza sensores
+        if track_mask:
+            self.sensors.update(self.angle, self.rect.center, track_mask)
+
+    def manual_control(self):
         keys = pygame.key.get_pressed()
 
         # Controle de aceleração
@@ -50,23 +82,22 @@ class Car:
         if keys[pygame.K_RIGHT]:
             self.angle += self.rotation_speed
 
-        # Movimento baseado no ângulo
-        rad = math.radians(self.angle)
-        dx = self.speed * math.cos(rad)
-        dy = self.speed * math.sin(rad)
-        self.rect.x += dx
-        self.rect.y += dy
+    def apply_action(self, action):
+        """
+        Mapeia as 9 ações da rede neural para comandos do carro.
+        """
+        if action in [1,5,6]:   # acelerar
+            self.speed = min(self.speed + self.acceleration, self.max_speed)
+        elif action in [2,7,8]: # dar ré
+            self.speed = max(self.speed - self.acceleration, -self.max_speed/2)
+        else:  # nada → atrito
+            if self.speed > 0: self.speed -= 0.05
+            if self.speed < 0: self.speed += 0.05
 
-        # Atualiza sprite rotacionado
-        self.image = pygame.transform.rotate(self.original_image, -self.angle)  # inversão pra alinhar
-        self.rect = self.image.get_rect(center=self.rect.center)
-
-        # Atualiza máscara baseada na rotação
-        self.mask = pygame.mask.from_surface(self.image)
-
-        # Atualiza sensores
-        if track_mask:
-            self.sensors.update(self.angle, self.rect.center, track_mask)
+        if action in [3,5,7]:   # virar esquerda
+            self.angle -= self.rotation_speed
+        if action in [4,6,8]:   # virar direita
+            self.angle += self.rotation_speed
 
     def draw(self, screen):
         # Desenha o carro

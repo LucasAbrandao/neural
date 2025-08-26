@@ -40,6 +40,9 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB:
+            car.use_ai = not car.use_ai
+            print("🤖 IA:", car.use_ai)
 
     # Atualiza carro com sensores ativos
     car.update(track.mask)
