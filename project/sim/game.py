@@ -1,4 +1,9 @@
 import pygame
+import sys
+import os
+
+# garante que o diretório raiz (project/) esteja no path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from car import Car
 from track import Track

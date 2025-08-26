@@ -1,8 +1,16 @@
-# project/nn/policy.py
 import numpy as np
-from .model import Model
-from .layers import Dense
-from .activations import ReLU, Softmax
+
+try:
+    # quando rodado como módulo (-m sim.game)
+    from .model import Model
+    from .layers import Dense
+    from .activations import ReLU, Softmax
+except ImportError:
+    # quando rodado direto (python3 game.py)
+    from nn.model import Model
+    from nn.layers import Dense
+    from nn.activations import ReLU, Softmax
+
 
 class CarPolicy:
     def __init__(self, input_size=9, hidden_size=12, output_size=9):
